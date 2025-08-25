@@ -1,2 +1,161 @@
-# xotoiiiiiii
-zotoiiii
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Operator & Verifikator Barcode</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    button { padding: 4px 10px; margin: 2px; cursor: pointer; }
+    .btn-ok { background: #4caf50; color: white; border: none; }
+    .btn-del { background: #f44336; color: white; border: none; }
+    #scannerModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+      background:rgba(0,0,0,0.7); align-items:center; justify-content:center; }
+    #scanner { width:300px; height:200px; background:#000; }
+    .form-inline { margin-bottom: 10px; }
+    select { padding: 5px; margin-right: 10px; }
+  </style>
+</head>
+<body>
+
+  <h2>Input Data</h2>
+  <div class="form-inline">
+    <label>Line: </label>
+    <select id="lineSelect">
+      <option value="">-- Pilih Line --</option>
+      <option value="Line A">Line A</option>
+      <option value="Line B">Line B</option>
+    </select>
+
+    <label>Part Number: </label>
+    <select id="partSelect">
+      <option value="">-- Pilih Part --</option>
+      <option value="PN-1001">PN-1001</option>
+      <option value="PN-2002">PN-2002</option>
+      <option value="PN-3003">PN-3003</option>
+    </select>
+
+    <button id="addRowBtn">Tambah Data</button>
+  </div>
+
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>Line</th>
+        <th>Part Number</th>
+        <th>Barcode</th>
+        <th>Operator</th>
+        <th>Verifikator</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Modal scanner -->
+  <div id="scannerModal">
+    <div id="scanner"></div>
+  </div>
+
+<script>
+  const tableBody = document.querySelector("#dataTable tbody");
+  const addRowBtn = document.getElementById("addRowBtn");
+  const lineSelect = document.getElementById("lineSelect");
+  const partSelect = document.getElementById("partSelect");
+  const scannerModal = document.getElementById("scannerModal");
+
+  let currentRow = null;
+  let currentMode = "";
+
+  addRowBtn.onclick = () => {
+    if(!lineSelect.value || !partSelect.value){ 
+      alert("Pilih Line dan Part Number dulu"); return; 
+    }
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${lineSelect.value}</td>
+      <td>${partSelect.value}</td>
+      <td class="barcode">-</td>
+      <td class="operator">
+        <button class="op-ok btn-ok">OK</button>
+        <button class="op-del btn-del">Delete</button>
+      </td>
+      <td class="verifikator">-</td>
+    `;
+    tableBody.appendChild(row);
+  };
+
+  tableBody.onclick = (e) => {
+    const row = e.target.closest("tr");
+    if(e.target.classList.contains("op-ok")){
+      currentRow = row;
+      currentMode = "operator";
+      openScanner();
+    } 
+    else if(e.target.classList.contains("op-del")){
+      row.remove();
+    } 
+    else if(e.target.classList.contains("v-ok")){
+      currentRow = row;
+      currentMode = "verifikator";
+      openScanner();
+    } 
+    else if(e.target.classList.contains("v-del")){
+      row.remove();
+    }
+  };
+
+  let html5Qr;
+  function openScanner(){
+    scannerModal.style.display = "flex";
+    html5Qr = new Html5Qrcode("scanner");
+    html5Qr.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 100 },
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13
+        ] 
+      },
+      (decodedText) => {
+        applyBarcode(decodedText);
+      }
+    ).catch(err => {
+      alert("Camera error: " + err);
+    });
+  }
+
+  function applyBarcode(code){
+    html5Qr.stop().then(() => {
+      html5Qr.clear();
+      scannerModal.style.display = "none";
+
+      if(currentMode === "operator"){
+        currentRow.querySelector('.barcode').textContent = code;
+        currentRow.querySelector('.operator').textContent = "✔ OK";
+        currentRow.querySelector('.verifikator').innerHTML = `
+          <button class="v-ok btn-ok">OK</button>
+          <button class="v-del btn-del">Delete</button>
+        `;
+      } 
+      else if(currentMode === "verifikator"){
+        const operatorCode = currentRow.querySelector('.barcode').textContent;
+        if(code === operatorCode){
+          currentRow.querySelector('.verifikator').textContent = "✔ OK";
+        } else {
+          if(confirm("❌ Barcode tidak sama!\n\nPilih OK untuk Ulangi Scan, atau Cancel untuk Kembali.")){
+            openScanner(); // ulangi
+            return;
+          }
+        }
+      }
+
+      currentRow = null;
+      currentMode = "";
+    });
+  }
+</script>
+</body>
+</html>
